@@ -14,4 +14,3 @@ ENV MODE=production
 # Set MODE=development in .env when run locally to listen for changes
 CMD ["sh", "-c", "if [ \"$MODE\" = 'development' ]; then fastapi dev app/main.py --host 0.0.0.0 --port 8080 --reload; else fastapi run app/main.py --host 0.0.0.0 --port 8080; fi"]
 
-#CMD ["fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8080"]

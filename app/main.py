@@ -1,36 +1,41 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import os, psycopg
 from psycopg.rows import dict_row
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 app = FastAPI()
 
-print(os.environ.get('DB_URL'))
-
-try:
-    conn = psycopg.connect(os.environ.get('DB_URL'), autocommit=True, row_factory=dict_row)
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS foo ( id SERIAL PRIMARY KEY );
-            ALTER TABLE foo ADD COLUMN IF NOT EXISTS name VARCHAR;
-            ALTER TABLE foo ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT now()""")
-    
-except Exception as e:
-    print(e)
+def get_conn():
+    return psycopg.connect(DATABASE_URL, autocommit=True, row_factory=psycopg.rows.dict_row)
 
 @app.get("/")
-def read_root():
-    return { "Hello": "Rahti2", "v": "0.5" }
+def get_root():
+    return { "msg": "Clothing Store v0.1" }
 
-
-@app.get("/items/{id}")
-def read_item(item_id: int, q: str = None):
-    return {"id": id, "q": q}
-
-
-@app.get("/db")
-def read_db():
-    with conn.cursor() as cur:
-        cur.execute("""INSERT INTO foo (name) VALUES ('test')""")
-        cur.execute("""SELECT *, version() FROM foo ORDER BY id DESC LIMIT 10""")
+# GET /categories 
+@app.get("/categories")
+def get_categories():
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT category_id, name FROM categories ORDER BY category_id;")
         return cur.fetchall()
+
+# GET /categories/{id}
+@app.get("/categories/{category_id}")
+def get_category(category_id: int):
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT category_id, name FROM categories WHERE category_id = %s;", (category_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Category not found")
+        return row
+
+# POST /categories
+@app.post("/categories", status_code=201)
+def create_category(data: dict):
+    name = data.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing 'name'")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("INSERT INTO categories (name) VALUES (%s) RETURNING category_id, name;", (name,))
+        return cur.fetchone()
